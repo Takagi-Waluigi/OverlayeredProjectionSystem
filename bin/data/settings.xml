@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<group>
+	<camera_mode>1</camera_mode>
+	<screen_width>1000</screen_width>
+	<camera_position>0, 806.122, 0</camera_position>
+	<radius>1400</radius>
+	<rot_Y>210.6</rot_Y>
+	<camera_roll>32.4</camera_roll>
+</group>

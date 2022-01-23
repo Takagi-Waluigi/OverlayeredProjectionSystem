@@ -2,6 +2,11 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+	//ofSetFullscreen(true);
+	ofSetVerticalSync(false);
+
+	ofSetBackgroundColor(0);
+
 	//GUI init
 	{
 		gui.setup();
@@ -12,37 +17,65 @@ void ofApp::setup(){
 		roll.set("camera roll", 0, -180, 180);
 		radius.set("radius", 10, -1000, 1000);
 		rotationY.set("rot Y", 0, 0, 360);
-		roomScale.set("room scale", 12, 0, 30);
+		roomScale.set("room scale", 24, 0, 30);
 		enableRecieving.set("enable recieving", false);
 		fov.set("fov", 60, 0, 180);
+		userMode.set("user selection", false);
+		markerVisible.set("marker visible", true);
+		channel.set("channel", 0, 0, 10);
+		gridVisible.set("grid visible", true);
+		roomVisible.set("room visible", true);
 
-		gui.add(cameraMode);
-		gui.add(screenWidth);
-		gui.add(objectPosition);
-		gui.add(radius);
-		gui.add(rotationY);
-		gui.add(roll);
-		gui.add(roomScale);
-		gui.add(enableRecieving);
-		gui.add(fov);
+		communicationSettings.setName("communication settings");
+		communicationSettings.add(userMode);
+		communicationSettings.add(enableRecieving);
+
+		cameraSettings.setName("camera settings");
+		cameraSettings.add(cameraMode);
+		cameraSettings.add(markerVisible);
+		cameraSettings.add(radius);
+		cameraSettings.add(fov);
+		cameraSettings.add(roll);
+		cameraSettings.add(objectPosition);
+		cameraSettings.add(rotationY);
+		
+		drawingSettings.setName("drawing settings");
+		drawingSettings.add(gridVisible);
+		drawingSettings.add(roomVisible);
+		drawingSettings.add(channel);
+		//drawingSettings.add(roomScale);
+		
+	
+		gui.add(communicationSettings);
+		gui.add(cameraSettings);
+		gui.add(drawingSettings);
+
+		guiVisible = true;
+		
 	}
 	
 	//Load Room
 	model.loadModel("/scaniverse-20210909-113953.obj");
 
-	//Osc setup
-	reciever.setup(PORT);
+	//OSC setup
+	om.setup();
 
+	//Drawing Patterns Setup
+	drawPatterns.setup();
 
+	
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
-	//osc recieving
+	//osc update
 	{
-		if (enableRecieving) oscReciever();
+		if (enableRecieving) om.update();
+		int id = (userMode) ? 0 : 1;
+		TrackerTransformInfo = om.getTransformInfo(id); //0: trackerA, 1: trackerB, 2:marker
+		MarkerTransformInfo = om.getTransformInfo(2);
 	}
-
+	
 	//camera settings
 	{
 		cam.setFarClip(100000);
@@ -69,13 +102,13 @@ void ofApp::update(){
 
 		if(enableRecieving) cam.roll(TrackerTransformInfo.w + roll); else cam.roll(rotationY + roll);
 
-		//fov = ofRadToDeg(PI - atan2(objectPosition->y, objectPosition->x + screenWidth / 2 * cos(-ofDegToRad(addedRoll)) + objectPosition->x) * 2);
-
 		cam.setFov(fov);
 	}
 	
-	//cam.setAspectRatio(0.5625);
-	
+	//draw patterns update
+	{
+		drawPatterns.update(channel);
+	}
 }
 
 //--------------------------------------------------------------
@@ -83,9 +116,9 @@ void ofApp::draw(){
 	ofEnableDepthTest();
 	if (cameraMode) cam.begin(); else ecam.begin();
 
-	
 	//単位は㎜ 1000＝1ｍ
-	grid.draw(16, 500);
+	if(gridVisible) grid.draw(15, 1000);			 //指標グリッド
+	drawPatterns.draw(channel, userMode); //描画パターン
 
 	ofNoFill();
 	if (!cameraMode)
@@ -97,8 +130,8 @@ void ofApp::draw(){
 		//ofSetColor(200, 128);
 		//model.disableTextures();
 		model.setScale(roomScale, roomScale, roomScale);
-		//model.drawWireframe();
-		model.drawFaces();
+		if(roomVisible) model.drawWireframe();
+		//model.drawFaces();
 		ofPopMatrix();
 
 		ofPushMatrix();
@@ -136,51 +169,51 @@ void ofApp::draw(){
 				        cameraPosition.z + (screenWidth / 2) * sin(-ofDegToRad(rotY))));
 	}
 
+	//Marker
+	if (markerVisible)
+	{
+		ofPushMatrix();
+		ofPushStyle();
+
+		ofTranslate(MarkerTransformInfo.x, MarkerTransformInfo.y, MarkerTransformInfo.z);
+		ofRotateX(90);
+		ofFill();
+		ofSetColor(255);
+		ofDrawCircle(0, 0, 30);
+
+		ofNoFill();
+		ofSetLineWidth(10);
+		ofSetColor(255, 0, 0);
+		ofDrawCircle(0, 0, 40);
+
+		ofPopStyle();
+		ofPopMatrix();
+	}
 	if (cameraMode) cam.end(); else ecam.end();
 	ofDisableDepthTest();
-	gui.draw();
-	ofDrawBitmapString("fov: " + ofToString(fov), ofGetWidth() / 2, 30);
-	ofDrawBitmapString("tracker info" + ofToString(TrackerTransformInfo), ofGetWidth() / 2, 45);
 
-}
-
-void ofApp::oscReciever()
-{
-	while (reciever.hasWaitingMessages())
+	//GUI
 	{
-		ofxOscMessage msg;
-		reciever.getNextMessage(msg);
-
-		if (msg.getAddress() == "/leftHand")
+		if (guiVisible)
 		{
-			TrackerTransformInfo.x = msg.getArgAsFloat(0) * 1000;
-			TrackerTransformInfo.y = msg.getArgAsFloat(1) * 1000;
-			TrackerTransformInfo.z = msg.getArgAsFloat(2) * -1000;
-			TrackerTransformInfo.w = -msg.getArgAsFloat(3);
+			ofPushStyle();
+			ofFill();
+			gui.draw();
+			if (om.isRecieving) ofSetColor(0, 255, 0); else ofSetColor(255, 0, 0);
+			ofDrawRectangle(ofGetWidth() / 2, 20, 10, 10);
+			ofSetColor(255);
+			ofDrawBitmapString("recieving status", ofGetWidth() / 2 + 20, 30);
+			ofDrawBitmapString("tracker info: " + ofToString(TrackerTransformInfo), ofGetWidth() / 2, 45);
+			ofDrawBitmapString("fps: " + ofToString(ofGetFrameRate()), ofGetWidth() / 2, 60);
+			ofPopStyle();
 		}
-
-		//oscDump(msg);
+		
 	}
-}
-
-void ofApp::oscDump(ofxOscMessage m)
-{
-	string msg_string;
-	msg_string = m.getAddress();
-	for (int i = 0; i < m.getNumArgs(); i++) {
-		msg_string += " ";
-		if (m.getArgType(i) == OFXOSC_TYPE_INT32)
-			msg_string += ofToString(m.getArgAsInt32(i));
-		else if (m.getArgType(i) == OFXOSC_TYPE_FLOAT)
-			msg_string += ofToString(m.getArgAsFloat(i));
-		else if (m.getArgType(i) == OFXOSC_TYPE_STRING)
-			msg_string += m.getArgAsString(i);
-	}
-	cout << msg_string << endl;
+	
 }
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
-
+	if (key == ' ') guiVisible = !guiVisible;
 }
 
 //--------------------------------------------------------------

@@ -4,9 +4,10 @@
 #include "ofxGui.h"
 #include "ofxSimpleGrid.h"
 #include "ofxAssimpModelLoader.h"
-#include "ofxOsc.h"
 
-#define PORT 8005
+#include "DrawPatterns.h"
+#include "OscManager.h"
+
 
 using namespace glm;
 
@@ -29,13 +30,16 @@ class ofApp : public ofBaseApp{
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
 
-		void oscReciever();
-		void oscDump(ofxOscMessage m);
 
 		ofCamera cam;
 		ofEasyCam ecam;
 
 		ofxPanel gui;
+
+		ofParameterGroup communicationSettings;
+		ofParameterGroup cameraSettings;
+		ofParameterGroup drawingSettings;
+
 		ofParameter<bool> cameraMode;
 		ofParameter<vec3> objectPosition;
 		ofParameter<float> radius;
@@ -45,16 +49,29 @@ class ofApp : public ofBaseApp{
 		ofParameter<float> roomScale;
 		ofParameter<bool> enableRecieving;
 		ofParameter<float> fov;
-		ofVec3f cameraPosition;
-		
+		ofParameter<bool> userMode;
+		ofParameter<bool> markerVisible;
+		ofParameter<bool> gridVisible;
+		ofParameter<bool> roomVisible;
+
+		ofParameter<int> channel;
+		bool guiVisible;
+
+		ofVec3f cameraPosition;	
 		
 		float addedRoll;
 		ofxSimpleGrid grid;
 
 		ofxAssimpModelLoader model;
 
-		ofxOscReceiver reciever;
+		ofFbo fbo;
 
 		ofVec4f TrackerTransformInfo;
-		
+		ofVec4f MarkerTransformInfo;
+
+		float hostTime = 0;
+
+		DrawPatterns drawPatterns;
+
+		OscManager om;
 };
